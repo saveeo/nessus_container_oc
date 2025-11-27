@@ -1,0 +1,20 @@
+# change the image to target right arch
+FROM localhost/nessus-scanner_10.10.1:v0.1-x86_64
+
+#FROM localhost/nessus-scanner_amd64:v0.1
+
+LABEL maintainer="Saveeo" \
+    org.opencontainers.image.authors="Saveeo"
+
+USER root
+
+COPY init-entrypoint-new.sh /usr/local/bin/init-entrypoint.sh
+
+RUN chmod +x /usr/local/bin/init-entrypoint.sh
+    # mkdir -p /nessus && cp -aR /opt/nessus/* /nessus/ && \
+    # chown -R root:root /nessus && \
+    # setcap 'cap_net_admin,cap_net_raw,cap_sys_resource+eip' /nessus/sbin/nessusd && \
+    # setcap 'cap_net_admin,cap_net_raw,cap_sys_resource+eip' /opt/nessus/sbin/nessus-service
+
+
+ENTRYPOINT ["/usr/local/bin/init-entrypoint.sh"]

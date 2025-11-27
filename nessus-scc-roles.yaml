@@ -1,0 +1,85 @@
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: nessus-scanner-scc
+allowPrivilegedContainer: false
+requiredDropCapabilities:
+  - ALL
+allowedCapabilities:
+  - NET_ADMIN
+  - NET_RAW
+  - SYS_RESOURCE
+runAsUser:
+  type: RunAsAny
+seLinuxContext:
+  type: RunAsAny
+fsGroup:
+  type: RunAsAny
+supplementalGroups:
+  type: RunAsAny
+volumes:
+  - configMap
+  - downwardAPI
+  - emptyDir
+  - persistentVolumeClaim
+  - secret
+---
+# Role to allow using the nessus-scanner-scc
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tenable-sc-scc-role
+  namespace: tenable-sc # <-- Make sure this is your namespace
+rules:
+  - apiGroups:
+      - security.openshift.io
+    resources:
+      - securitycontextconstraints
+    resourceNames:
+      - nessus-scanner-scc
+    verbs:
+      - use
+---
+# Bind the Role to the default Service Account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tenable-sc-can-use-scc
+  namespace: tenable-sc # <-- Make sure this is your namespace
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: tenable-sc-scc-role
+subjects:
+  - kind: ServiceAccount
+    name: default # Or the name of the Service Account your deployment
+---
+# Role to allow using the nessus-scanner-scc
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tenable-scanner-scc-role
+  namespace: tenable-scanner
+rules:
+  - apiGroups:
+      - security.openshift.io
+    resources:
+      - securitycontextconstraints
+    resourceNames:
+      - nessus-scanner-scc
+    verbs:
+      - use
+---
+# Bind the Role to the default Service Account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tenable-scanner-can-use-scc
+  namespace: tenable-scanner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: tenable-scanner-scc-role
+subjects:
+  - kind: ServiceAccount
+    name: default # Or the name of the Service Account your deployment

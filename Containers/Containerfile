@@ -1,0 +1,42 @@
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal
+
+LABEL maintainer="saveeo" \
+     org.opencontainers.image.authors="saveeo"
+
+
+RUN microdnf update -y && \
+    microdnf install -y procps-ng shadow-utils util-linux glibc libstdc++  && \
+    microdnf clean all
+
+ARG NESSUS_RPM="Nessus_amd64.rpm"
+ENV NESSUS_RPM=$NESSUS_RPM
+
+COPY ${NESSUS_RPM} /tmp/Nessus.rpm
+
+RUN rpm -ivh /tmp/Nessus.rpm && rm -rf /tmp/Nessus.rpm
+
+RUN useradd -r -s /sbin/nologin nessus
+
+RUN chmod 770 /opt/nessus/sbin/*
+
+RUN chown -R nessus:nessus /opt/nessus
+
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+RUN setcap 'cap_net_admin,cap_net_raw,cap_sys_resource+eip' /opt/nessus/sbin/nessusd && \
+    setcap 'cap_net_admin,cap_net_raw,cap_sys_resource+eip' /opt/nessus/sbin/nessus-service
+
+
+RUN mkdir -p /etc/systemd/system/nessusd.service.d && \
+        echo "[Service]\nUser=nessus\nGroup=nessus\nExecStart=\nExecStart=/opt/nessus/sbin/nessusd --no-root" > /etc/systemd/system/nessusd.service.d/override.conf
+
+EXPOSE 8834
+
+USER nessus
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
+#CMD ["--no-root"]

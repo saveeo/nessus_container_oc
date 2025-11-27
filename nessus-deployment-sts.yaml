@@ -1,0 +1,120 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nessus-scanner-test
+  namespace: tenable-sc
+  labels:
+    app: nessus-scanner-test
+  annotations:
+    "kube-linter.io/ignore-all": "drop-net-raw-capability"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nessus-scanner-test
+  template:
+    metadata:
+      labels:
+        app: nessus-scanner-test
+    spec:
+      securityContext:
+        fsGroup: 999
+      initContainers:
+        - name: prepare-nessus-data
+          image: localhost/nessus-scanner-init_new_10.10.1:v0.1-x86_64
+          imagePullPolicy: Always
+          command:
+            [
+              "sh",
+              "-c",
+              "echo The app is running! && mkdir -p /data/etc && mkdir -p /data/var && mkdir -p /data/com && mkdir -p /data/plugins && cp -R /opt/nessus/var/nessus/ /data/var/ && cp -R /opt/nessus/etc/nessus/ /data/etc && cp -R /opt/nessus/com/nessus/ /data/com/ && cp -R /opt/nessus/lib/nessus/plugins/ /data/plugins/ && sleep 120",
+            ]
+          securityContext:
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+            allowPrivilegeEscalation: true
+            readOnlyRootFilesystem: false
+          volumeMounts:
+            - name: nessus-data
+              mountPath: /data/
+      containers:
+        - name: nessus-scanner
+          image: localhost/nessus-scanner_no-root:v0.2
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8834
+              protocol: TCP
+          resources:
+            requests:
+              memory: "2Gi" # Placeholder
+              cpu: "2000m" # Placeholder
+            limits:
+              memory: "8Gi" # Placeholder
+              cpu: "4000m" # Placeholder
+          volumeMounts:
+            - name: nessus-data
+              mountPath: /opt/nessus/var/nessus
+              subPath: var/nessus
+            - name: nessus-data
+              mountPath: /opt/nessus/etc/nessus
+              subPath: etc/nessus
+            - name: nessus-data
+              mountPath: /opt/nessus/com/nessus
+              subPath: com/nessus
+            - name: nessus-data
+              mountPath: /opt/nessus/lib/nessus/plugins
+              subPath: plugins/plugins
+              # subPath: nessus-app
+          securityContext:
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+            capabilities:
+              add:
+                - NET_ADMIN
+                - NET_RAW
+                - SYS_RESOURCE
+              drop:
+                - ALL
+            allowPrivilegeEscalation: true
+            readOnlyRootFilesystem: false
+          livenessProbe:
+            tcpSocket:
+              port: 8834
+            initialDelaySeconds: 60 # Give Nessus time to start
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: 8834
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+      serviceAccountName: default
+  volumeClaimTemplates:
+    - metadata:
+        name: nessus-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nessus-scanner-test
+  namespace: tenable-sc
+  labels:
+    app: nessus-scanner-test
+spec:
+  selector:
+    app: nessus-scanner-test
+  ports:
+    - protocol: TCP
+      port: 8834
+      targetPort: 8834
+  type: ClusterIP # Expose externally via MetalLB
